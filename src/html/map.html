@@ -9,12 +9,147 @@
   integrity="sha512-hoalWLoI8r4UszCkZ5kL8vayOGVae1oxXe/2A4AO6J9+580uKHDO3JdHb7NzwwzK5xr/Fs0W40kiNHxM9vyTtQ=="
   crossorigin=""/>
   <style>
+    html, body {
+      padding: 0;
+      margin: 0;
+    }
     #map {
       height: 100vh;
+    }
+    .map-dialog {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 1000;
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgb(0 0 0 / 30%);
+      max-width: 300px;
+      width: 100%;
+      pointer-events: none;
+      visibility: hidden;
+      opacity: 0;
+      transition: opacity 0.35s ease-in-out;
+    }
+    .map-actions {
+      margin: 20px 0;
+    }
+    .map-actions a {
+      padding: 5px;
+      background: #607d8b;
+      color: #fff;
+      text-decoration: none;
+      border-radius: 5px;
+    }
+    .map-dialog.is-active {
+      pointer-events: auto;
+      visibility: visible;
+      opacity: 1;
+    }
+    .map-row {
+      display: flex;
+      padding: 12px 0;
+      border-bottom: 1px solid #eee;
+    }
+    .map-title {
+      flex: 0 0 110px;
+    }
+    .map-dialog-title {
+      background: cadetblue;
+      color: #fff;
+      font-size: 20px;
+      padding: 10px;
+      position: absolute;
+      top: -30px;
+      left: 20px;
+      right: 20px;
+      border-radius: 5px;
+    }
+    .loading-container {
+      position: absolute;
+      z-index: 1001;
+      width: 100%;
+      left: 0;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: rgba(33,33,33,.3);
+    }
+    .loading-container.is-inactive {
+      display: none;
+    }
+    .loading {
+      display: inline-block;
+      width: 80px;
+      height: 80px;
+    }
+    .loading p {
+      color: #eee;
+    }
+    .loading:before {
+      content: " ";
+      display: block;
+      width: 64px;
+      height: 64px;
+      margin: 8px;
+      border-radius: 50%;
+      border: 6px solid #eee;
+      border-color: #eee transparent #eee transparent;
+      animation: loadingAni 1.2s linear infinite;
+    }
+    @keyframes loadingAni {
+      0% {
+        transform: rotate(0deg);
+      }
+      100% {
+        transform: rotate(360deg);
+      }
     }
   </style>
 </head>
 <body>
+  <div class="loading-container">
+    <div class="loading">
+      <p>自動定位中</p>
+    </div>
+  </div>
   <div id="map"></div>
+  <div class="map-dialog" id="dialog">
+    <div class="map-dialog-title" id="title">
+      藥局名稱
+    </div>
+    <div class="map-row">
+      <div class="map-title">廠牌項目</div>
+      <div class="map-content" id="brand">xxxx</div>
+    </div>
+    <div class="map-row">
+      <div class="map-title">目前結餘數量</div>
+      <div class="map-content" id="num">xxxx</div>
+    </div>
+    <div class="map-row">
+      <div class="map-title">醫事機構地址</div>
+      <div class="map-content" id="address">xxxx</div>
+    </div>
+    <div class="map-row">
+      <div class="map-title">電話</div>
+      <div class="map-content" id="tel">xxxx</div>
+    </div>
+    <div class="map-row">
+      <div class="map-title">備註</div>
+      <div class="map-content" id="tips">xxxx</div>
+    </div>
+    <div class="map-row">
+      <div class="map-title">資料更新時間</div>
+      <div class="map-content" id="time">xxxx</div>
+    </div>
+    <div class="map-actions">
+      <a id="googlemap" target="_blank" rel="noopener">開啟 google 導航</a>
+    </div>
+  </div>
 </body>
 </html>

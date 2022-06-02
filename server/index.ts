@@ -12,7 +12,7 @@ const app: Express = express();
 const server: Server = https.createServer({
   key: fs.readFileSync(path.resolve(__dirname, 'key.pem')),
   cert: fs.readFileSync(path.resolve(__dirname, 'cert.pem')),
-  // requestCert: true,
+  requestCert: false,
   rejectUnauthorized: false
 }, app);
 const wss = new WebSocketServer({ server });
@@ -34,6 +34,9 @@ const getData: () => void = () => {
     });
     res.on('end', () => {
       const parse: Array<{}> = CSV.parse(data, { output: 'objects' });
+      fs.writeFile(path.resolve(__dirname, 'public/data.json'), JSON.stringify(parse), (error) => {
+        console.log(error);
+      })
       ev.emit('wsSend', parse);
     });
   })
@@ -63,7 +66,6 @@ wss.on('connection', (ws: WebSocket) => {
   ws.on('message', (data) => {
     console.log(data.toString());
   });
-  gws.send('1111');
 });
 
 ev.on('wsSend', (data) => {

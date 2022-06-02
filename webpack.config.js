@@ -40,5 +40,14 @@ module.exports = {
     host: '0.0.0.0',
     hot: true,
     // https: true,
+    proxy: {
+      '/api': {
+        target: 'https://localhost:3000',
+        pathRewrite: {
+          '^/api': '',
+        },
+        secure: false,
+      }
+    }
   },
 }

@@ -1,33 +1,31 @@
 import leaflet, { Map, Circle, Marker, MarkerClusterGroup } from 'leaflet';
 import 'leaflet.markercluster';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
-import dataJson from '../data.json';
+import axios from 'axios';
 
 const socket: WebSocket = new WebSocket('wss://localhost:3000');
-
-socket.addEventListener('open', (event: Event) => {
-  socket.send('hello server');
-});
-
-socket.addEventListener('message', (event: MessageEvent<string>) => {
-  const test = event.data;
-  console.log(test);
-});
 
 const map: Map = leaflet.map('map').setView([23.5, 121], 7);
 let longitude: number;
 let latitude: number;
-
-// 設定地圖圖磚
-leaflet.tileLayer(
-  'https://wmts.nlsc.gov.tw/wmts/EMAP6/default/GoogleMapsCompatible/{z}/{y}/{x}',
-  { maxZoom: 18, id: 'EMAP6' }
-).addTo(map);
-
 const markers: MarkerClusterGroup = leaflet.markerClusterGroup();
 const allMarkersDataMap: { [key: string]: {} } = {};
-
-dataJson.forEach((item) => {
+const setDialogContent: (userLng: number, userLat: number, item: any) => void = (userLng, userLat, item) => {
+  const lng:string = item['經度'];
+  const lat:string = item['緯度'];
+  // !. 是告訴 typescript，document.getElementById('title') 不會是 null 或 undefined
+  document.getElementById('title')!.textContent = item['醫事機構名稱'];
+  document.getElementById('brand')!.textContent = item['廠牌項目'];
+  document.getElementById('num')!.textContent = item['快篩試劑截至目前結餘存貨數量'];
+  document.getElementById('address')!.textContent = item['醫事機構地址'];
+  document.getElementById('tel')!.textContent = item['醫事機構電話'];
+  document.getElementById('tips')!.textContent = item['備註'];
+  document.getElementById('time')!.textContent = item['來源資料時間'];
+  const aLink = document.getElementById('googlemap') as HTMLAnchorElement;
+  // https://developers.google.com/maps/documentation/urls/get-started
+  aLink.href = `https://www.google.com/maps/dir/?api=1&origin${userLat},${userLng}&destination=${lat},${lng}&travelmode=driving`
+}
+const setMarker: (item: any) => Marker = (item) => {
   const lng:string = item['經度'];
   const lat:string = item['緯度'];
   const marker: Marker = leaflet.marker([Number(lat), Number(lng)], {
@@ -40,23 +38,48 @@ dataJson.forEach((item) => {
     if (!isDialogOpen) {
       dialog!.classList.add('is-active');
     }
-    // !. 是告訴 typescript，document.getElementById('title') 不會是 null 或 undefined
-    document.getElementById('title')!.textContent = item['醫事機構名稱'];
-    document.getElementById('brand')!.textContent = item['廠牌項目'];
-    document.getElementById('num')!.textContent = item['快篩試劑截至目前結餘存貨數量'];
-    document.getElementById('address')!.textContent = item['醫事機構地址'];
-    document.getElementById('tel')!.textContent = item['醫事機構電話'];
-    document.getElementById('tips')!.textContent = item['備註'];
-    document.getElementById('time')!.textContent = item['來源資料時間'];
-    const aLink = document.getElementById('googlemap') as HTMLAnchorElement;
-    // https://developers.google.com/maps/documentation/urls/get-started
-    aLink.href = `https://www.google.com/maps/dir/?api=1&origin${latitude},${longitude}&destination=${lat},${lng}&travelmode=driving`
+    setDialogContent(longitude, latitude, item);
   });
-  allMarkersDataMap[item['醫事機構名稱']] = item;
-  markers.addLayer(marker);
+  return marker;
+}
+
+socket.addEventListener('open', (event: Event) => {
+  // socket.send('hello server');
 });
 
-map.addLayer(markers);
+socket.addEventListener('message', (event: MessageEvent<string>) => {
+  const dataJson = JSON.parse(event.data);
+  markers.clearLayers();
+
+  dataJson.forEach((item: any) => {
+    const marker = setMarker(item);
+    allMarkersDataMap[item['醫事機構名稱']] = item;
+    markers.addLayer(marker);
+  });
+
+  const nowDialogTitle: string = document.getElementById('title')!.textContent || '';
+  setDialogContent(longitude, latitude, allMarkersDataMap[nowDialogTitle]);
+});
+
+// 設定地圖圖磚
+leaflet.tileLayer(
+  'https://wmts.nlsc.gov.tw/wmts/EMAP6/default/GoogleMapsCompatible/{z}/{y}/{x}',
+  { maxZoom: 18, id: 'EMAP6' }
+).addTo(map);
+
+axios.get('/api/public/data.json')
+  .then((res) => {
+    const dataJson = res.data;
+    dataJson.forEach((item: any) => {
+      const marker = setMarker(item);
+      allMarkersDataMap[item['醫事機構名稱']] = item;
+      markers.addLayer(marker);
+    });
+    map.addLayer(markers);
+  })
+  .catch((error) => {
+    window.alert('取得資料失敗');
+  });
 
 navigator.geolocation.getCurrentPosition((position: GeolocationPosition) => {
   longitude = position.coords.longitude;

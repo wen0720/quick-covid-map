@@ -1,9 +1,11 @@
 import leaflet, { Map, Circle, Marker, MarkerClusterGroup } from 'leaflet';
 import 'leaflet.markercluster';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
+import { io } from 'socket.io-client';
 import axios from 'axios';
 
-const socket: WebSocket = new WebSocket(`wss://${window.location.host}`);
+
+const socket = io(`wss://${window.location.host}`);
 
 const map: Map = leaflet.map('map').setView([23.5, 121], 7);
 let longitude: number;
@@ -53,13 +55,10 @@ const setMarker: (item: any) => Marker = (item) => {
   return marker;
 }
 
-socket.addEventListener('open', (event: Event) => {});
-
-socket.addEventListener('message', (event: MessageEvent<string>) => {
-  const dataJson = JSON.parse(event.data);
+socket.on('data', (msg) => {
   markers.clearLayers();
 
-  dataJson.forEach((item: any) => {
+  msg.forEach((item: any) => {
     const marker = setMarker(item);
     allMarkersDataMap[item['醫事機構名稱']] = item;
     markers.addLayer(marker);

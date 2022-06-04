@@ -1,8 +1,9 @@
-import { WebSocketServer, WebSocket } from 'ws';
+// import { WebSocketServer, WebSocket } from 'ws';
 import { Express, Request, Response } from 'express';
 import * as https from 'https';
 import * as http from 'http';
-import { Server, RequestOptions } from 'http';
+import { RequestOptions } from 'http';
+import { Server } from 'socket.io';
 import * as path from 'path';
 import * as events from 'events';
 import * as fs from 'fs';
@@ -25,8 +26,8 @@ if (isDev) {
   server = http.createServer({}, app);
 }
 
-const wss = new WebSocketServer({ server });
-const ev = new events.EventEmitter();
+const io = new Server(server, {});
+// const ev = new events.EventEmitter();
 
 const getOption: RequestOptions = {
   hostname: 'data.nhi.gov.tw',
@@ -49,9 +50,13 @@ const getData: () => void = () => {
         fs.writeFile(path.resolve(__dirname, 'public/data.json'), JSON.stringify(parse), (error) => {});
       }
       else {
-        fs.writeFile('/tmp/data.json', JSON.stringify(parse), (error) => {});
+        try {
+          fs.writeFile('/tmp/data.json', JSON.stringify(parse), (error) => {});
+        } catch(e) {
+          console.log(e);
+        }
       }
-      ev.emit('wsSend', parse);
+      io.emit('data', JSON.stringify(parse));
     });
   })
 
@@ -73,20 +78,21 @@ cron.schedule(
   }
 )
 
-let gws: WebSocket | null  = null;
+// let gws: WebSocket | null  = null;
 
-wss.on('connection', (ws: WebSocket) => {
-  gws = ws;
-  ws.on('message', (data) => {
-    console.log(data.toString());
-  });
+io.on('connection', (socket) => {
+  console.log('a user connect');
+  // gws = ws;
+  // ws.on('message', (data) => {
+  //   console.log(data.toString());
+  // });
 });
 
-ev.on('wsSend', (data) => {
-  if (gws) {
-    gws.send(JSON.stringify(data));
-  }
-});
+// ev.on('wsSend', (data) => {
+//   if (gws) {
+//     gws.send(JSON.stringify(data));
+//   }
+// });
 
 app.use('/public', express.static(path.join(__dirname, 'public')));
 app.get('/data', (req, res) => {

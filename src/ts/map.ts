@@ -3,13 +3,22 @@ import 'leaflet.markercluster';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import axios from 'axios';
 
-const socket: WebSocket = new WebSocket('wss://localhost:3000');
+const socket: WebSocket = new WebSocket(`wss://${window.location.host}`);
 
 const map: Map = leaflet.map('map').setView([23.5, 121], 7);
 let longitude: number;
 let latitude: number;
 const markers: MarkerClusterGroup = leaflet.markerClusterGroup();
 const allMarkersDataMap: { [key: string]: {} } = {};
+const pharmacyIcon = leaflet.icon({
+  iconUrl: require('img/pharmacy.png'),
+  iconSize: [36, 36],
+  shadowUrl: require('img/pharmacy-shadow.png'),
+  shadowSize: [40, 17],
+  shadowAnchor: [15, 0],
+  popupAnchor:  [0, -10]
+});
+
 const setDialogContent: (userLng: number, userLat: number, item: any) => void = (userLng, userLat, item) => {
   const lng:string = item['經度'];
   const lat:string = item['緯度'];
@@ -30,6 +39,7 @@ const setMarker: (item: any) => Marker = (item) => {
   const lat:string = item['緯度'];
   const marker: Marker = leaflet.marker([Number(lat), Number(lng)], {
     title: item['醫事機構名稱'],
+    icon: pharmacyIcon,
   });
   marker.bindPopup(`<h3>${item['醫事機構名稱']}</h3><p>快篩剩餘數量：${item['快篩試劑截至目前結餘存貨數量']}</p>`);
   marker.on('click', (e) => {
@@ -43,9 +53,7 @@ const setMarker: (item: any) => Marker = (item) => {
   return marker;
 }
 
-socket.addEventListener('open', (event: Event) => {
-  // socket.send('hello server');
-});
+socket.addEventListener('open', (event: Event) => {});
 
 socket.addEventListener('message', (event: MessageEvent<string>) => {
   const dataJson = JSON.parse(event.data);
@@ -67,9 +75,11 @@ leaflet.tileLayer(
   { maxZoom: 18, id: 'EMAP6' }
 ).addTo(map);
 
-axios.get('/api/public/data.json')
+const apiPrefix = process.env.NODE_ENV === 'development' ? '/api' : '';
+
+axios.get(`${apiPrefix}/data`)
   .then((res) => {
-    const dataJson = res.data;
+    const dataJson = res.data.data;
     dataJson.forEach((item: any) => {
       const marker = setMarker(item);
       allMarkersDataMap[item['醫事機構名稱']] = item;

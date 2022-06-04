@@ -1,20 +1,30 @@
 import { WebSocketServer, WebSocket } from 'ws';
-import express, { Express, Request, Response } from 'express';
-import https, { Server, RequestOptions } from 'https';
-import path from 'path';
-import events from 'events';
-import fs from 'fs';
+import { Express, Request, Response } from 'express';
+import * as https from 'https';
+import * as http from 'http';
+import { Server, RequestOptions } from 'http';
+import * as path from 'path';
+import * as events from 'events';
+import * as fs from 'fs';
+const express = require('express');
 const cron = require('node-cron');
 const CSV = require('csv-string');
 
-
+const isDev = process.env.NODE_ENV === 'development';
 const app: Express = express();
-const server: Server = https.createServer({
-  key: fs.readFileSync(path.resolve(__dirname, 'key.pem')),
-  cert: fs.readFileSync(path.resolve(__dirname, 'cert.pem')),
-  requestCert: false,
-  rejectUnauthorized: false
-}, app);
+let server = null;
+
+if (isDev) {
+  server = https.createServer({
+    key: fs.readFileSync(path.resolve(__dirname, 'key.pem')),
+    cert: fs.readFileSync(path.resolve(__dirname, 'cert.pem')),
+    requestCert: false,
+    rejectUnauthorized: false
+  }, app);
+} else {
+  server = http.createServer({}, app);
+}
+
 const wss = new WebSocketServer({ server });
 const ev = new events.EventEmitter();
 
@@ -27,16 +37,20 @@ const getOption: RequestOptions = {
 
 const getData: () => void = () => {
   let data = '';
-  const req = https.request(getOption, (res) => {
+  const protocol = isDev ? https : http;
+  const req = protocol.request(getOption, (res) => {
     res.on('data', (d) => {
       const str = d.toString();
       data += str;
     });
     res.on('end', () => {
       const parse: Array<{}> = CSV.parse(data, { output: 'objects' });
-      fs.writeFile(path.resolve(__dirname, 'public/data.json'), JSON.stringify(parse), (error) => {
-        console.log(error);
-      })
+      if (isDev) {
+        fs.writeFile(path.resolve(__dirname, 'public/data.json'), JSON.stringify(parse), (error) => {});
+      }
+      else {
+        fs.writeFile('/tmp/data.json', JSON.stringify(parse), (error) => {});
+      }
       ev.emit('wsSend', parse);
     });
   })
@@ -74,10 +88,34 @@ ev.on('wsSend', (data) => {
   }
 });
 
-app.use('/public', express.static(path.join(__dirname, 'public')))
+app.use('/public', express.static(path.join(__dirname, 'public')));
+app.get('/data', (req, res) => {
+  if (isDev) {
+    try {
+      const data = fs.readFileSync(path.resolve(__dirname, 'public/data.json'));
+      res.status(200).json({ success: true, data: JSON.parse(data.toString()) });
+    } catch(err) {
+      console.log(err);
+      res.status(500).json({ success: false });
+    }
+  } else {
+    try {
+      const data = fs.readFileSync('/tmp/data.json');
+      res.status(200).json({ success: true, data: JSON.parse(data.toString()) });
+    } catch(err) {
+      console.log(err);
+      res.status(500).json({ success: false });
+    }
+  }
+});
+app.get('*', (req, res) => {
+  res.redirect('/public/map.html')
+});
 
-server.listen(3000, () => {
-  console.log('app listening at http://localhost:3000')
+server.listen(process.env.PORT || 3000, () => {
+  if (isDev) {
+    console.log('app listening at https://localhost:3000')
+  }
 });
 
 getData();

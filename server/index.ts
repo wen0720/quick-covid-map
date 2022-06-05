@@ -5,7 +5,6 @@ import * as http from 'http';
 import { RequestOptions } from 'http';
 import { Server } from 'socket.io';
 import * as path from 'path';
-import * as events from 'events';
 import * as fs from 'fs';
 const express = require('express');
 const cron = require('node-cron');
@@ -16,6 +15,7 @@ const app: Express = express();
 let server = null;
 
 if (isDev) {
+  // 自己簽的憑證，for 開發用
   server = https.createServer({
     key: fs.readFileSync(path.resolve(__dirname, 'key.pem')),
     cert: fs.readFileSync(path.resolve(__dirname, 'cert.pem')),
@@ -23,11 +23,13 @@ if (isDev) {
     rejectUnauthorized: false
   }, app);
 } else {
+  // 因為在 GAE，ssl 做在 nginx，所以不用 https server
   server = http.createServer({}, app);
 }
 
-const io = new Server(server, {});
-// const ev = new events.EventEmitter();
+const io = new Server(server, {
+  ...(isDev ? { cors: { origin: 'http://localhost:3001' } }: {})
+});
 
 const getOption: RequestOptions = {
   hostname: 'data.nhi.gov.tw',
@@ -77,21 +79,9 @@ cron.schedule(
   }
 )
 
-// let gws: WebSocket | null  = null;
-
 io.on('connection', (socket) => {
   console.log('a user connect');
-  // gws = ws;
-  // ws.on('message', (data) => {
-  //   console.log(data.toString());
-  // });
 });
-
-// ev.on('wsSend', (data) => {
-//   if (gws) {
-//     gws.send(JSON.stringify(data));
-//   }
-// });
 
 app.use('/public', express.static(path.join(__dirname, 'public')));
 app.get('/data', (req, res) => {
@@ -113,6 +103,7 @@ app.get('/data', (req, res) => {
     }
   }
 });
+
 app.get('*', (req, res) => {
   res.redirect('/public/map.html')
 });

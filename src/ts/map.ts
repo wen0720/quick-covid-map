@@ -4,8 +4,11 @@ import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import { io } from 'socket.io-client';
 import axios from 'axios';
 
+const wsUrl = process.env.NODE_ENV === 'development'
+  ? 'localhost:3000'
+  : window.location.host
 
-const socket = io(`wss://${window.location.host}`);
+const socket = io(`wss://${wsUrl}`);
 
 const map: Map = leaflet.map('map').setView([23.5, 121], 7);
 let longitude: number;

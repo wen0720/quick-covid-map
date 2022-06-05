@@ -38,8 +38,7 @@ const getOption: RequestOptions = {
 
 const getData: () => void = () => {
   let data = '';
-  const protocol = isDev ? https : http;
-  const req = protocol.request(getOption, (res) => {
+  const req = https.request(getOption, (res) => {
     res.on('data', (d) => {
       const str = d.toString();
       data += str;
@@ -56,7 +55,7 @@ const getData: () => void = () => {
           console.log(e);
         }
       }
-      io.emit('data', JSON.stringify(parse));
+      io.emit('data', parse);
     });
   })
 

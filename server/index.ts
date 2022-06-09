@@ -73,7 +73,9 @@ cron.schedule(
   '*/5 * * * *',
   () => {
     console.log('emit after 5 mintues');
-    getData();
+    if (!isDev) {
+      getData();
+    }
   }, {
     scheduled: true,
   }

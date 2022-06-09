@@ -3,6 +3,24 @@ import 'leaflet.markercluster';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import { io } from 'socket.io-client';
 import axios from 'axios';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInWithPopup, signInWithRedirect,
+  getRedirectResult, GoogleAuthProvider, onAuthStateChanged,
+  signOut } from 'firebase/auth';
+import { getDatabase, ref, set, push, onValue } from 'firebase/database';
+
+type itemType = {
+  來源資料時間: string;
+  備註: string;
+  廠牌項目: string;
+  快篩試劑截至目前結餘存貨數量: string;
+  經度: string;
+  緯度: string;
+  醫事機構名稱: string;
+  醫事機構地址: string;
+  醫事機構電話: string;
+  醫事機構代碼: string;
+}
 
 const wsUrl = process.env.NODE_ENV === 'development'
   ? 'localhost:3000'
@@ -13,8 +31,9 @@ const socket = io(`wss://${wsUrl}`);
 const map: Map = leaflet.map('map').setView([23.5, 121], 7);
 let longitude: number;
 let latitude: number;
+let nowItem: itemType;
 const markers: MarkerClusterGroup = leaflet.markerClusterGroup();
-const allMarkersDataMap: { [key: string]: {} } = {};
+const allMarkersDataMap: { [key: string]: itemType } = {};
 const pharmacyIcon = leaflet.icon({
   iconUrl: require('img/pharmacy.png'),
   iconSize: [36, 36],
@@ -22,6 +41,10 @@ const pharmacyIcon = leaflet.icon({
   shadowSize: [40, 17],
   shadowAnchor: [15, 0],
   popupAnchor:  [0, -10]
+});
+const manIcon = leaflet.icon({
+  iconUrl: require('img/man.png'),
+  iconSize: [60, 60],
 });
 
 const setDialogContent: (userLng: number, userLat: number, item: any) => void = (userLng, userLat, item) => {
@@ -48,6 +71,7 @@ const setMarker: (item: any) => Marker = (item) => {
   });
   marker.bindPopup(`<h3>${item['醫事機構名稱']}</h3><p>快篩剩餘數量：${item['快篩試劑截至目前結餘存貨數量']}</p>`);
   marker.on('click', (e) => {
+    nowItem = item;
     const dialog = document.getElementById('dialog');
     const isDialogOpen: boolean = dialog!.classList.contains('is-active');
     if (!isDialogOpen) {
@@ -56,6 +80,46 @@ const setMarker: (item: any) => Marker = (item) => {
     setDialogContent(longitude, latitude, item);
   });
   return marker;
+}
+
+const getPharmacyAndSetMap = () => {
+  const apiPrefix = process.env.NODE_ENV === 'development' ? '/api' : '';
+  axios.get(`${apiPrefix}/data`)
+    .then((res) => {
+      const dataJson = res.data.data;
+      dataJson.forEach((item: itemType) => {
+        const marker = setMarker(item);
+        allMarkersDataMap[item['醫事機構名稱']] = item;
+        markers.addLayer(marker);
+      });
+      map.addLayer(markers);
+    })
+    .catch((error) => {
+      window.alert('取得資料失敗');
+    });
+}
+
+const getGspAndSetMap = () => {
+  document.querySelector('.loading-container')!.classList.remove('is-inactive');
+  document.getElementById('loadingText')!.textContent = '自動定位中';
+  return new Promise<void>((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition((position: GeolocationPosition) => {
+      longitude = position.coords.longitude;
+      latitude = position.coords.latitude;
+      const marker: Marker = leaflet.marker([latitude, longitude], {
+        title: '現在位置',
+        icon: manIcon,
+      }).addTo(map);
+      marker.bindPopup('現在位置').openPopup();
+      map.setView([latitude, longitude], 15);
+      document.querySelector('.loading-container')!.classList.add('is-inactive');
+      resolve();
+    }, () => {
+      console.log('whooppppps error');
+      document.querySelector('.loading-container')!.classList.add('is-inactive');
+      resolve();
+    });
+  });
 }
 
 socket.on('data', (msg) => {
@@ -77,35 +141,201 @@ leaflet.tileLayer(
   { maxZoom: 18, id: 'EMAP6' }
 ).addTo(map);
 
-const apiPrefix = process.env.NODE_ENV === 'development' ? '/api' : '';
 
-axios.get(`${apiPrefix}/data`)
-  .then((res) => {
-    const dataJson = res.data.data;
-    dataJson.forEach((item: any) => {
-      const marker = setMarker(item);
-      allMarkersDataMap[item['醫事機構名稱']] = item;
-      markers.addLayer(marker);
-    });
-    map.addLayer(markers);
+document.querySelector('.map-dialog-title-close')!.addEventListener('click', () => {
+  document.getElementById('dialog')!.classList.remove('is-active');
+});
+
+function animationTillEndByClass(target:HTMLElement, classText:string, type: boolean = true): Promise<void> {
+  let resolveTemp: (() => void) | null = null;
+  return new Promise<HTMLElement>((resolve) => {
+    resolveTemp = resolve.bind(null, target);
+    target.addEventListener('transitionend', resolveTemp);
+    if (type) {
+      target.classList.add(classText);
+    } else {
+      target.classList.remove(classText);
+    }
+  }).then((target) => {
+    target.removeEventListener('transitionend', resolveTemp as () => void);
   })
-  .catch((error) => {
-    window.alert('取得資料失敗');
-  });
+};
 
-navigator.geolocation.getCurrentPosition((position: GeolocationPosition) => {
-  longitude = position.coords.longitude;
-  latitude = position.coords.latitude;
-  const circle: Circle = leaflet.circle([latitude, longitude], {
-    radius: 20,
-    color: 'red',
-    fillOpacity: 0.5,
-  }).addTo(map);
-  map.setView([latitude, longitude], 15);
-  document.querySelector('.loading-container')!.classList.add('is-inactive');
-}, () => {
-  console.log('whooppppps error');
-  document.querySelector('.loading-container')!.classList.add('is-inactive');
+const firebaseConfig = {
+  apiKey: "AIzaSyA2mJJkqFFilVUC47Dys-ZAMG68M-JlYrY",
+  authDomain: "project-4c5bf.firebaseapp.com",
+  databaseURL: "https://project-4c5bf.firebaseio.com",
+  projectId: "project-4c5bf",
+  storageBucket: "project-4c5bf.appspot.com",
+  messagingSenderId: "379694882039",
+  appId: "1:379694882039:web:ed275ba28e8e87476b87f2"
+};
+
+let init = true;
+const app = initializeApp(firebaseConfig);
+const database = getDatabase(app);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
+const signInPopup: () => void = () => {
+  signInWithPopup(auth, provider)
+    .then((result) => {
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      const token = credential?.accessToken;
+      const user = result.user;
+      console.log(token, user);
+    })
+    .catch((error) => {
+      const errorCode = error.code;
+      const errorMessage = error.message;
+      const email = error.customData.email;
+    });
+}
+const signInRedirect: () => void = () => {
+  signInWithRedirect(auth, provider).catch((error) => {
+    console.log(error);
+  });
+};
+
+
+getPharmacyAndSetMap();
+
+onAuthStateChanged(auth, async (user) => {
+  if (user) {
+    // 想在已經確定登入之後做的事
+    const { displayName } = user;
+    if (displayName) {
+      document.getElementById('name')!.textContent = displayName;
+    }
+  } else {
+    document.getElementById('name')!.textContent = '未登入';
+  }
+
+  if (init) {
+    if (user) {
+      // 初次載入已登入
+      await getGspAndSetMap();
+    } else {
+      // show 登入 popup
+      document.getElementById('login-dialog')!.classList.remove('is-inactive');
+      document.getElementById('login-dialog')!.classList.add('is-active');
+    }
+    init = false;
+  }
+
+  if (user) {
+    // 使用者登錄中
+    document.getElementById('login-dialog')!.classList.add('is-inactive');
+    document.getElementById('login-dialog')!.classList.remove('is-active');
+    document.querySelector('.loading-container')!.classList.add('is-inactive');
+
+    document.getElementById('googleLogout')!.classList.remove('d-none')
+    document.getElementById('googleLogin')!.classList.add('d-none')
+    const { uid } = user;
+    const hosRef = ref(database, `users/${uid}/hospitals`);
+
+    // 取得使用者訂閱的醫院清單
+    onValue(hosRef, (snapshot) => {
+      const data: { [key: string]: { hospitalName: string } } = snapshot.val();
+      const html = Object.values(data).map(({ hospitalName }) => {
+        const item = allMarkersDataMap[hospitalName];
+        return `
+          <li>
+            <div>${item['醫事機構名稱']}</div>
+            <div>${item['快篩試劑截至目前結餘存貨數量']}</div>
+            <div>${item['醫事機構地址']}</div>
+            <div>${item['醫事機構電話']}</div>
+            <div>${item['備註']}</div>
+          </li>
+        `
+      }).join('');
+      document.getElementById('hos-list')!.innerHTML = html;
+      // console.log(data);
+      // console.log('value trigger');
+    });
+  } else {
+    document.getElementById('googleLogout')!.classList.add('d-none')
+    document.getElementById('googleLogin')!.classList.remove('d-none')
+  }
+});
+
+
+let isMenudoing = false;
+document.querySelector('.profile-btn')!.addEventListener('click', () => {
+  if (isMenudoing) {
+    return;
+  }
+  const menuEl: HTMLElement | null = document.querySelector('.profile-menu');
+  if (!menuEl!.classList.contains('is-active')) {
+    console.log('active');
+    isMenudoing = true;
+    menuEl!.classList.add('d-block');
+    window.requestAnimationFrame(() => {
+      animationTillEndByClass(menuEl as HTMLElement, 'is-active')
+        .then(() => {
+          isMenudoing = false;
+        });
+    });
+  } else {
+    isMenudoing = true;
+    animationTillEndByClass(menuEl as HTMLElement, 'is-active', false)
+      .then(() => {
+        menuEl!.classList.remove('d-block');
+        isMenudoing = false;
+      });
+  }
+});
+
+document.getElementById('googleLogin')!.addEventListener('click', () => {
+  signInPopup();
+});
+
+document.getElementById('loginWaitBtn')!.addEventListener('click', () => {
+  document.getElementById('login-dialog')!.classList.remove('is-active');
+  document.getElementById('login-dialog')!.classList.add('is-inactive');
+  getGspAndSetMap();
+});
+
+document.getElementById('loginGoBtn')!.addEventListener('click', () => {
+  signInPopup();
+});
+
+document.getElementById('googleLogout')!.addEventListener('click', () => {
+  signOut(auth).then(() => {
+    console.log('登出成功');
+  }).catch(() => {
+    console.log('登出失敗');
+  });
+});
+
+// 查看清單
+document.getElementById('showList')!.addEventListener('click', () => {
+  document.getElementById('hos-list-wrapper')!.classList.add('is-active');
+});
+
+// 加入清單
+document.getElementById('addToList')!.addEventListener('click', () => {
+  if (auth.currentUser) {
+    const postData = {
+      hospitalName: nowItem['醫事機構名稱'],
+    };
+    const hosListRef = ref(database, `users/${auth.currentUser.uid}/hospitals`);
+    const newHosRef = push(hosListRef);
+    set(newHosRef, postData);
+  }
+});
+
+// 點擊地圖時把 menu 和 清單 關掉
+document.getElementById('map')!.addEventListener('click', () => {
+  const menuEl = document.querySelector('.profile-menu') as HTMLElement;
+  if (menuEl.classList.contains('is-active')) {
+    isMenudoing = true;
+    animationTillEndByClass(menuEl as HTMLElement, 'is-active', false)
+      .then(() => {
+        menuEl!.classList.remove('d-block');
+        document.getElementById('hos-list-wrapper')!.classList.remove('is-active');
+        isMenudoing = false;
+      });
+  }
 });
 
 // leaf cluster

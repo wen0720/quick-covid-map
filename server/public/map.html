@@ -2,6 +2,9 @@
       padding: 0;
       margin: 0;
     }
+    * {
+      box-sizing: border-box;
+    }
     #map {
       height: 100vh;
     }
@@ -9,7 +12,7 @@
       position: fixed;
       bottom: 20px;
       right: 20px;
-      z-index: 1000;
+      z-index: 999;
       background-color: #fff;
       padding: 20px;
       border-radius: 5px;
@@ -17,7 +20,6 @@
       max-width: 300px;
       width: 100%;
       pointer-events: none;
-      visibility: hidden;
       opacity: 0;
       transition: opacity 0.35s ease-in-out;
     }
@@ -33,7 +35,6 @@
     }
     .map-dialog.is-active {
       pointer-events: auto;
-      visibility: visible;
       opacity: 1;
     }
     .map-row {
@@ -55,6 +56,30 @@
       right: 20px;
       border-radius: 5px;
     }
+    .map-dialog-title-close {
+      width: 30px;
+      height: 30px;
+      position: absolute;
+      right: 30px;
+      top: -24px;
+      cursor: pointer;
+    }
+    .map-dialog-title-close:after {
+      content: '';
+      width: 25px;
+      height: 3px;
+      background: #fff;
+      position: absolute;
+      transform: rotate(45deg) translate(14px, 7px);
+    }
+    .map-dialog-title-close:before {
+      content: '';
+      width: 25px;
+      height: 3px;
+      background: #fff;
+      position: absolute;
+      transform: rotate(-45deg) translate(-7px, 14px);
+    }
     .loading-container {
       position: absolute;
       z-index: 1001;
@@ -74,11 +99,12 @@
     }
     .loading {
       display: inline-block;
-      width: 80px;
-      height: 80px;
+      width: 100px;
+      height: 100px;
     }
     .loading p {
       color: #eee;
+      font-size: 20px;
     }
     .loading:before {
       content: " ";
@@ -110,4 +136,122 @@
     }
     .leaflet-marker-icon {
       transition: all 0.35s ease;
-    }</style><script defer="defer" src="map.js"></script></head><body><div class="loading-container"><div class="loading"><p>自動定位中</p></div></div><div id="map"></div><div class="map-dialog" id="dialog"><div class="map-dialog-title" id="title">藥局名稱</div><div class="map-row"><div class="map-title">廠牌項目</div><div class="map-content" id="brand">xxxx</div></div><div class="map-row"><div class="map-title">目前結餘數量</div><div class="map-content" id="num">xxxx</div></div><div class="map-row"><div class="map-title">醫事機構地址</div><div class="map-content" id="address">xxxx</div></div><div class="map-row"><div class="map-title">電話</div><div class="map-content" id="tel">xxxx</div></div><div class="map-row"><div class="map-title">備註</div><div class="map-content" id="tips">xxxx</div></div><div class="map-row"><div class="map-title">資料更新時間</div><div class="map-content" id="time">xxxx</div></div><div class="map-actions"><a id="googlemap" target="_blank" rel="noopener">開啟 google 導航</a></div></div><div class="icon"><a target="_blank" href="https://icons8.com/icon/YZZLTJGUVRar/pharmacy">Pharmacy</a> icon by <a target="_blank" href="https://icons8.com">Icons8</a></div></body></html>
+    }
+    .profile {
+      position: fixed;
+      z-index: 1000;
+      background: #fff;
+      right: 10px;
+      top: 10px;
+      box-shadow: 0 0 10px rgb(0 0 0 / 40%);
+      padding: 10px 10px 10px 20px;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+    }
+    .profile-name {
+      font-size: 18px;
+    }
+    .profile-btn-wrapper {
+      width: 60px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      cursor: pointer;
+    }
+    .profile-btn-wrapper span {
+      width: 40%;
+      height: 4px;
+      display: block;
+      background: cadetblue;
+      margin: 3px auto;
+    }
+    .profile-menu {
+      position: absolute;
+      top: 60px;
+      width: 100%;
+      right: 0px;
+      background: #fff;
+      box-shadow: 0 0 10px rgb(0 0 0 / 40%);
+      border-radius: 20px;
+      padding: 10px;
+      display: none;
+      opacity: 0;
+      transition: opacity 0.35s ease-in;
+    }
+    .profile-menu.is-active {
+      opacity: 1;
+    }
+    .profile-menu-item {
+      padding: 5px 0px 5px 20px;
+      cursor: pointer;
+      transition: all 0.35s ease;
+      border-radius: 20px;
+    }
+    .profile-menu-item:hover {
+      background-color: #eee;
+    }
+    .login-dialog {
+      position: fixed;
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+      padding: 0 20px;
+      z-index: 9999;
+      transition: all 0.5s ease-in-out;
+    }
+    .login-dialog.is-inactive {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .login-dialog.is-active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .login-wrapper {
+      max-width: 600px;
+      margin: 30vh auto 0 auto;
+      background-color: #fff;
+      border-radius: 30px;
+      padding: 20px 30px;
+    }
+    .login-title {
+      text-align: center;
+      color: #111;
+      margin: 0 0 10px;
+    }
+    .login-des {
+      color: #333;
+      padding: 10px;
+      text-align: center;
+      margin: 0 0 40px;
+    }
+    .login-btns {
+      display: flex;
+      justify-content: center;
+    }
+    .login-btns > * {
+      margin-left: 10px;
+    }
+    .login-btn {
+      width: 150px;
+      padding: 10px 5px;
+      border-radius: 5px;
+      text-align: center;
+      cursor: pointer;
+    }
+    .login-btn.primary {
+      background: cadetblue;
+      color: #fff;
+    }
+    .login-btn.normal {
+      background: #ccc;
+      color: #666;
+    }
+    .d-block {
+      display: block;
+    }
+    .d-none {
+      display: none;
+    }</style><script defer="defer" src="map.js"></script></head><body><div class="loading-container"><div class="loading"><p id="loadingText">載入中</p></div></div><div id="map"></div><div class="profile"><div id="name" class="profile-name">未登入</div><div class="profile-btn"><div class="profile-btn-wrapper"><span></span><div style="width:100%;"></div><span></span><div style="width:100%;"></div><span></span></div></div><div class="profile-menu"><div id="googleLogin" class="profile-menu-item">gooogle 登入</div><div id="googleLogout" class="profile-menu-item">登出</div></div></div><div class="map-dialog" id="dialog"><div class="map-dialog-title" id="title">藥局名稱</div><div class="map-dialog-title-close"></div><div class="map-row"><div class="map-title">廠牌項目</div><div class="map-content" id="brand">xxxx</div></div><div class="map-row"><div class="map-title">目前結餘數量</div><div class="map-content" id="num">xxxx</div></div><div class="map-row"><div class="map-title">醫事機構地址</div><div class="map-content" id="address">xxxx</div></div><div class="map-row"><div class="map-title">電話</div><div class="map-content" id="tel">xxxx</div></div><div class="map-row"><div class="map-title">備註</div><div class="map-content" id="tips">xxxx</div></div><div class="map-row"><div class="map-title">資料更新時間</div><div class="map-content" id="time">xxxx</div></div><div class="map-actions"><a id="googlemap" target="_blank" rel="noopener">開啟 google 導航</a></div></div><div class="icon"><a target="_blank" href="https://icons8.com/icon/YZZLTJGUVRar/pharmacy">Pharmacy</a> <a target="_blank" href="https://icons8.com/icon/eprJzDofEHdP/standing-man">Standing Man</a> icon by <a target="_blank" href="https://icons8.com">Icons8</a></div><div id="login-dialog" class="login-dialog is-inactive"><div class="login-wrapper"><h2 class="login-title">登入帳戶</h2><div class="login-des">將特定藥局加入我的最愛！時時關注不費力！</div><div class="login-btns"><div id="loginWaitBtn" class="login-btn normal">先等一下</div><div id="loginGoBtn" class="login-btn primary">登入 google 帳戶</div></div></div></div></body></html>

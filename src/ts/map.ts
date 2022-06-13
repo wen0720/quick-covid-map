@@ -10,16 +10,16 @@ import { getAuth, signInWithPopup, signInWithRedirect,
 import { getDatabase, ref, set, push, onValue } from 'firebase/database';
 
 type itemType = {
-  來源資料時間: string;
-  備註: string;
-  廠牌項目: string;
-  快篩試劑截至目前結餘存貨數量: string;
-  經度: string;
-  緯度: string;
-  醫事機構名稱: string;
-  醫事機構地址: string;
-  醫事機構電話: string;
-  醫事機構代碼: string;
+  '來源資料時間': string;
+  '備註': string;
+  '廠牌項目': string;
+  '快篩試劑截至目前結餘存貨數量': string;
+  '經度': string;
+  '緯度': string;
+  '醫事機構名稱': string;
+  '醫事機構地址': string;
+  '醫事機構電話': string;
+  '醫事機構代碼': string;
 }
 
 const wsUrl = process.env.NODE_ENV === 'development'
@@ -33,6 +33,7 @@ let longitude: number;
 let latitude: number;
 let nowItem: itemType;
 const markers: MarkerClusterGroup = leaflet.markerClusterGroup();
+let nowUserListIds: string[] = [];
 const allMarkersDataMap: { [key: string]: itemType } = {};
 const pharmacyIcon = leaflet.icon({
   iconUrl: require('img/pharmacy.png'),
@@ -47,7 +48,7 @@ const manIcon = leaflet.icon({
   iconSize: [60, 60],
 });
 
-const setDialogContent: (userLng: number, userLat: number, item: any) => void = (userLng, userLat, item) => {
+const setDialogContent: (userLng: number, userLat: number, item: itemType) => void = (userLng, userLat, item) => {
   const lng:string = item['經度'];
   const lat:string = item['緯度'];
   // !. 是告訴 typescript，document.getElementById('title') 不會是 null 或 undefined
@@ -58,6 +59,11 @@ const setDialogContent: (userLng: number, userLat: number, item: any) => void = 
   document.getElementById('tel')!.textContent = item['醫事機構電話'];
   document.getElementById('tips')!.textContent = item['備註'];
   document.getElementById('time')!.textContent = item['來源資料時間'];
+  if (nowUserListIds.indexOf(item['醫事機構代碼']) > -1) {
+    document.getElementById('addToList')?.classList.add('disabled');
+  } else {
+    document.getElementById('addToList')?.classList.remove('disabled');
+  }
   const aLink = document.getElementById('googlemap') as HTMLAnchorElement;
   // https://developers.google.com/maps/documentation/urls/get-started
   aLink.href = `https://www.google.com/maps/dir/?api=1&origin${userLat},${userLng}&destination=${lat},${lng}&travelmode=driving`
@@ -88,8 +94,16 @@ const getPharmacyAndSetMap = () => {
     .then((res) => {
       const dataJson = res.data.data;
       dataJson.forEach((item: itemType) => {
-        const marker = setMarker(item);
-        allMarkersDataMap[item['醫事機構名稱']] = item;
+        const newItem: itemType | any = {};
+        Object.keys(item).forEach((key: keyof itemType | string) => {
+          // Zero Width No-Break Space
+          // 後端寫檔案進去時，有一個 key(醫事機構代碼) 多了 Zero Width No-Break Space
+          // unicode 10 進位:65279，16 進位：feff
+          const newKey = key.replace(/\ufeff/g, '');
+          newItem[newKey] = (item as any)[key];
+        });
+        const marker = setMarker(newItem);
+        allMarkersDataMap[newItem['醫事機構代碼']] = newItem;
         markers.addLayer(marker);
       });
       map.addLayer(markers);
@@ -127,7 +141,7 @@ socket.on('data', (msg) => {
 
   msg.forEach((item: any) => {
     const marker = setMarker(item);
-    allMarkersDataMap[item['醫事機構名稱']] = item;
+    allMarkersDataMap[item['醫事機構代碼']] = item;
     markers.addLayer(marker);
   });
 
@@ -235,22 +249,65 @@ onAuthStateChanged(auth, async (user) => {
 
     // 取得使用者訂閱的醫院清單
     onValue(hosRef, (snapshot) => {
-      const data: { [key: string]: { hospitalName: string } } = snapshot.val();
-      const html = Object.values(data).map(({ hospitalName }) => {
-        const item = allMarkersDataMap[hospitalName];
+      const data: { [key: string]: { hospitalName: string, hospitalId: string } } = snapshot.val();
+      nowUserListIds = Object.keys(data).map((key: string) => data[key].hospitalId);
+      if (!data) {
+        return;
+      }
+      const html = Object.values(data).map(({ hospitalName, hospitalId }) => {
+        const item = allMarkersDataMap[hospitalId];
+        const lat = item['緯度'];
+        const lng = item['經度'];
+        const telString = item['醫事機構電話'].replace(/(\(|\))/g, '').slice(1);
+        const tel = `+886-${telString[0]}-${telString.slice(1)}`;
+        const addressUrl = `https://www.google.com/maps/dir/?api=1&origin${latitude},${longitude}&destination=${lat},${lng}&travelmode=driving`;
         return `
           <li>
-            <div>${item['醫事機構名稱']}</div>
-            <div>${item['快篩試劑截至目前結餘存貨數量']}</div>
-            <div>${item['醫事機構地址']}</div>
-            <div>${item['醫事機構電話']}</div>
-            <div>${item['備註']}</div>
+            <div class="list-close" data-closeKey="${item['醫事機構代碼']}"></div>
+            <div class="list-title">
+              <span>${item['醫事機構名稱']}</span>
+              <a href="tel:${tel}">
+                <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAABmJLR0QA/wD/AP+gvaeTAAAC3UlEQVRoge2YTWgTQRiGn9lgrfUPEYqKCHoXlArSCupF8NCCBy8etIdSWrulaoQ2iSABaZO0iiJNYixS8aAieBFE7FWpWIpeREHRgx5K9CDUv9ra/bxUTWKy2U0mEcs+kEPenf3mfTM72ZkBDw8PD48yULZX49EWFJeBdTat3iLSjhkc0+rMIUaRqwnszQNsQqlRbY5cYh9A2OiwzobyrZSGfYD/gEUfwKqKizIoFuBjVVyUQbFJ/KFKPkrGPoDiVZV8lEyxAONV8lEyReaA9cBZGRUq30pp2AdIzz4C9c6mhSDip6svoteWc+wDhMMWcL3A1XlEtWMGz2t35YLiLzKfGgF+5KhziBzG7LtSEVcuKB6go/c1cDNHfYYZvFERRy5xtpQQNUD2KGwnMbinIo5c4iyA2fcCRTxbtEaJh1dUwJMrnC/m5mZOA1MZymZU7QXtjlziPEBPeBpoAyRDbSMePabblBvcLae7AveA4SxNcY7kYLNGT65wvx9YNtOLMJmh+BDrFsnIXn22nGO/qS9Eqn89lm8iZ8v5CcvaR3fosR5rzihtR9ZxagrLaAGmM9SVGMYYw9HdWpw5pLQR+EU82oTiPpD5d/oVOLgwXwqTiIaA/oVvs8CXPK3eIBzHDDwsVKa8PbEZGAejGficodYBd0hEzYL3JWM9/DEPUAOsyfNpQHHNzkJ5I/CLS7EdWHIXqM/ShRTfa07g93/7rcVjbSgZcdV3V6BgWz2nEp19k/iMJuBllq7ooHb2KcmBXQDEI4dQkkLXD6ezEACp6GrmuQocyNPTE4StwBLXdW1GQG8AABFFInYSxRmgVkvNij9CmSglmIGzGFYDMKG9fg6VO5nrDD3n/UwjQitCulLd6H+E8nExvArfUj9KdQNrXd9f1Tlgx9DQcuqsVpQcAXY6ukdIYwYKHvFXN0AmicgWxNiPkkZQ20Dq+fs9ksYQk6PB2//GpIeHh8ei5yePyK8E5ckfwQAAAABJRU5ErkJggg=="/>
+              </a>
+              <a target="_blank" href="${addressUrl}">
+                <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAeCAYAAAA7MK6iAAAABmJLR0QA/wD/AP+gvaeTAAABsklEQVRIie3WQUsVURjG8Z8RboIugV2KdJlIS6VNLZJokUUr6zv4Da4t2qgfILfivi8QFuEiglaFCq3atQhdmhcTzNAWcwZG75mZe8cZaOEDL2eY5z3n/87cO+e8XKia2ljCJvZDbGAxeI3oBbo4yYkunjcBPS6ApnFcBv+An1jFLFoFuW3FT3o29nA9b7GzyUf4iA7uYQo3Qu7SANA0FsrA8wF4FJk8FXK3It5b3MIo1iL+Rhk4VUvyylcz3tXgxV7zaGbuWMTv9gsu8n5VAO/WAf4aWXgtwMfwLuJ/qQP8MrJwWXTqALckn16/0G1cqwMMj3DYB/QQD/OgVcDwRPKnyYPu4nERtCoYxsW/603cDjkjTYBhWLKBZDeT4eBN4kcT4LthbOMAv53elw9Kiq4M/o4r4XoZrweYey7wCVYqrntucNHCPf6loiqa1H8D3g9jPx1I9shM9QZzmBi0kFdO91BpBzKfudeR3yRkYydTSM9vPBSB38EzzOA+LucU+Ref8R6f8EfSnUzjAW5G5gz1XOSoJTkIZsII65Kzdl3SwOVpIhQwHR7gG56W8C5Uv/4BUD4M7Kcz/I0AAAAASUVORK5CYII="/>
+              </a>
+            </div>
+            <div class="list-num">
+              剩餘<span> ${item['快篩試劑截至目前結餘存貨數量']} </span>個
+            </div>
+            <div class="list-address">地址：${item['醫事機構地址']}</div>
+            <div class="list-remark">備註：${item['備註']}</div>
           </li>
         `
       }).join('');
       document.getElementById('hos-list')!.innerHTML = html;
-      // console.log(data);
-      // console.log('value trigger');
+      document.querySelectorAll<HTMLElement>('.list-close').forEach((el) => {
+        el.addEventListener('click', () => {
+          if (auth.currentUser) {
+            const hosListRef = ref(database, `users/${auth.currentUser.uid}/hospitals`);
+            onValue(hosListRef, (snapshot) => {
+              type firebaseHosipitalsType = {
+                [key: string]: {
+                  hospitalName: string,
+                  hospitalId: string,
+                },
+              }
+              const oldData: firebaseHosipitalsType = snapshot.val();
+              const newData = Object.keys(oldData).reduce((accu: firebaseHosipitalsType, childSnapKey) => {
+                if (oldData[childSnapKey].hospitalId === el.dataset.closekey) {
+                  return accu;
+                }
+                accu[childSnapKey] = oldData[childSnapKey];
+                return accu;
+              }, {});
+              set(hosListRef, newData);
+            }, {
+              onlyOnce: true,
+            })
+          }
+        });
+      });
     });
   } else {
     document.getElementById('googleLogout')!.classList.add('d-none')
@@ -302,6 +359,7 @@ document.getElementById('loginGoBtn')!.addEventListener('click', () => {
 document.getElementById('googleLogout')!.addEventListener('click', () => {
   signOut(auth).then(() => {
     console.log('登出成功');
+    document.getElementById('hos-list')!.innerHTML = '';
   }).catch(() => {
     console.log('登出失敗');
   });
@@ -315,12 +373,19 @@ document.getElementById('showList')!.addEventListener('click', () => {
 // 加入清單
 document.getElementById('addToList')!.addEventListener('click', () => {
   if (auth.currentUser) {
+    if (nowUserListIds.indexOf(nowItem['醫事機構代碼']) > -1) {
+      return;
+    }
     const postData = {
       hospitalName: nowItem['醫事機構名稱'],
+      hospitalId: nowItem['醫事機構代碼'],
     };
     const hosListRef = ref(database, `users/${auth.currentUser.uid}/hospitals`);
     const newHosRef = push(hosListRef);
-    set(newHosRef, postData);
+    set(newHosRef, postData).then(() => {
+      document.getElementById('addToList')!.classList.add('disabled');
+      alert('清單加入成功');
+    });
   }
 });
 

@@ -47,6 +47,9 @@
     .map-actions a.love {
       background: #e91e63;
     }
+    .map-actions a.love.disabled {
+      background: #717171;
+    }
     .map-dialog.is-active {
       pointer-events: auto;
       opacity: 1;
@@ -293,12 +296,66 @@
       padding: 0 20px;
     }
     .list-wrapper li {
+      position: relative;
       list-style: none;
-      padding: 15px;
+      padding: 0 15px 15px;
+      overflow: hidden;
       margin: 15px 0;
       border-radius: 20px;
       border: 1px solid #ddd;
     }
+    .list-title {
+      background: #607d8b;
+      color: #fff;
+      margin: 0 -15px;
+      padding: 7px 15px;
+    }
+    .list-title span {
+      vertical-align: middle;
+    }
+    .list-title img {
+      filter: brightness(0) invert(1);
+      width: 25px;
+      vertical-align: middle;
+    }
+    .list-title a {
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .list-address, .list-remark {
+      font-size: 12px;
+    }
+    .list-num {
+      padding: 10px 0;
+    }
+    .list-num span {
+      font-size: 24px;
+    }
+    .list-close {
+      position: absolute;
+      right: 10px;
+      top: 5px;
+      cursor: pointer;
+      width: 30px;
+      height: 30px;
+    }
+    .list-close:before {
+      content: '';
+      position: absolute;
+      width: 30px;
+      height: 2px;
+      background: #fff;
+      transform: translateY(13px) rotate(-45deg);
+    }
+    .list-close:after {
+      content: '';
+      position: absolute;
+      width: 30px;
+      height: 2px;
+      background: #fff;
+      transform: translateY(13px) rotate(45deg);
+    }
+
   </style>
 </head>
 <body>
@@ -360,6 +417,8 @@
     </div>
   </div>
   <div class="icon">
+    <a target="_blank" href="https://icons8.com/icon/59829/map-marker">Map Marker</a>
+    <a target="_blank" href="https://icons8.com/icon/9730/phone">Phone</a>
     <a target="_blank" href="https://icons8.com/icon/YZZLTJGUVRar/pharmacy">Pharmacy</a>
     <a target="_blank" href="https://icons8.com/icon/eprJzDofEHdP/standing-man">Standing Man</a>
     icon by <a target="_blank" href="https://icons8.com">Icons8</a>

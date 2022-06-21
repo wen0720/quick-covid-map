@@ -5,7 +5,7 @@ import { io } from 'socket.io-client';
 import axios from 'axios';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithPopup, signInWithRedirect,
-  getRedirectResult, GoogleAuthProvider, onAuthStateChanged,
+  getRedirectResult, GoogleAuthProvider, onAuthStateChanged, signInWithCredential,
   signOut } from 'firebase/auth';
 import { getDatabase, ref, set, push, onValue } from 'firebase/database';
 
@@ -118,8 +118,15 @@ const getGspAndSetMap = () => {
   document.getElementById('loadingText')!.textContent = '自動定位中';
   return new Promise<void>((resolve, reject) => {
     navigator.geolocation.getCurrentPosition((position: GeolocationPosition) => {
-      longitude = position.coords.longitude;
-      latitude = position.coords.latitude;
+      const { accuracy } = position.coords;
+      if (accuracy < 20) {
+        longitude = position.coords.longitude;
+        latitude = position.coords.latitude;
+      } else {
+        window.alert('定位異常，您將被定位在台北 101');
+        longitude = 121.564128;
+        latitude = 25.03369;
+      }
       const marker: Marker = leaflet.marker([latitude, longitude], {
         title: '現在位置',
         icon: manIcon,
@@ -182,7 +189,8 @@ const firebaseConfig = {
   projectId: "project-4c5bf",
   storageBucket: "project-4c5bf.appspot.com",
   messagingSenderId: "379694882039",
-  appId: "1:379694882039:web:ed275ba28e8e87476b87f2"
+  appId: "1:379694882039:web:ed275ba28e8e87476b87f2",
+  measurementId: "G-KH9HVYP6V3"
 };
 
 let init = true;
@@ -190,6 +198,10 @@ const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
+provider.addScope('https://www.googleapis.com/auth/user.gender.read');
+provider.setCustomParameters({
+  prompt: 'select_account',
+});
 const signInPopup: () => void = () => {
   signInWithPopup(auth, provider)
     .then((result) => {
@@ -210,6 +222,11 @@ const signInRedirect: () => void = () => {
   });
 };
 
+declare global {
+  interface Window {
+    google: any;
+  }
+}
 
 getPharmacyAndSetMap();
 
@@ -232,6 +249,25 @@ onAuthStateChanged(auth, async (user) => {
       // show 登入 popup
       document.getElementById('login-dialog')!.classList.remove('is-inactive');
       document.getElementById('login-dialog')!.classList.add('is-active');
+
+      // google one tap sign in
+      window.google.accounts.id.initialize({
+        client_id: '379694882039-humq2ch6mf9unuk3dprb36sioed930aj.apps.googleusercontent.com',
+        itp_support: true,
+        callback: (response:any) => {
+          const credential = GoogleAuthProvider.credential(response.credential);
+          signInWithCredential(auth, credential)
+            .then((res) => {
+              console.log(res);
+            })
+            .catch((error) => {
+              console.log(error);
+            });
+        },
+      });
+      window.google.accounts.id.prompt((notification: any) => {
+        console.log(notification);
+      });
     }
     init = false;
   }
@@ -343,7 +379,7 @@ document.querySelector('.profile-btn')!.addEventListener('click', () => {
 });
 
 document.getElementById('googleLogin')!.addEventListener('click', () => {
-  signInPopup();
+  signInRedirect();
 });
 
 document.getElementById('loginWaitBtn')!.addEventListener('click', () => {
@@ -353,7 +389,7 @@ document.getElementById('loginWaitBtn')!.addEventListener('click', () => {
 });
 
 document.getElementById('loginGoBtn')!.addEventListener('click', () => {
-  signInPopup();
+  signInRedirect();
 });
 
 document.getElementById('googleLogout')!.addEventListener('click', () => {
@@ -402,6 +438,7 @@ document.getElementById('map')!.addEventListener('click', () => {
       });
   }
 });
+
 
 // leaf cluster
 // https://github.com/Leaflet/Leaflet.markercluster

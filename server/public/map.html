@@ -33,6 +33,12 @@
       text-decoration: none;
       border-radius: 5px;
     }
+    .map-actions a.love {
+      background: #e91e63;
+    }
+    .map-actions a.love.disabled {
+      background: #717171;
+    }
     .map-dialog.is-active {
       pointer-events: auto;
       opacity: 1;
@@ -177,7 +183,7 @@
       padding: 10px;
       display: none;
       opacity: 0;
-      transition: opacity 0.35s ease-in;
+      transition: opacity 0.25s ease-in;
     }
     .profile-menu.is-active {
       opacity: 1;
@@ -254,4 +260,87 @@
     }
     .d-none {
       display: none;
-    }</style><script defer="defer" src="map.js"></script></head><body><div class="loading-container"><div class="loading"><p id="loadingText">載入中</p></div></div><div id="map"></div><div class="profile"><div id="name" class="profile-name">未登入</div><div class="profile-btn"><div class="profile-btn-wrapper"><span></span><div style="width:100%;"></div><span></span><div style="width:100%;"></div><span></span></div></div><div class="profile-menu"><div id="googleLogin" class="profile-menu-item">gooogle 登入</div><div id="googleLogout" class="profile-menu-item">登出</div></div></div><div class="map-dialog" id="dialog"><div class="map-dialog-title" id="title">藥局名稱</div><div class="map-dialog-title-close"></div><div class="map-row"><div class="map-title">廠牌項目</div><div class="map-content" id="brand">xxxx</div></div><div class="map-row"><div class="map-title">目前結餘數量</div><div class="map-content" id="num">xxxx</div></div><div class="map-row"><div class="map-title">醫事機構地址</div><div class="map-content" id="address">xxxx</div></div><div class="map-row"><div class="map-title">電話</div><div class="map-content" id="tel">xxxx</div></div><div class="map-row"><div class="map-title">備註</div><div class="map-content" id="tips">xxxx</div></div><div class="map-row"><div class="map-title">資料更新時間</div><div class="map-content" id="time">xxxx</div></div><div class="map-actions"><a id="googlemap" target="_blank" rel="noopener">開啟 google 導航</a></div></div><div class="icon"><a target="_blank" href="https://icons8.com/icon/YZZLTJGUVRar/pharmacy">Pharmacy</a> <a target="_blank" href="https://icons8.com/icon/eprJzDofEHdP/standing-man">Standing Man</a> icon by <a target="_blank" href="https://icons8.com">Icons8</a></div><div id="login-dialog" class="login-dialog is-inactive"><div class="login-wrapper"><h2 class="login-title">登入帳戶</h2><div class="login-des">將特定藥局加入我的最愛！時時關注不費力！</div><div class="login-btns"><div id="loginWaitBtn" class="login-btn normal">先等一下</div><div id="loginGoBtn" class="login-btn primary">登入 google 帳戶</div></div></div></div></body></html>
+    }
+    .list-wrapper {
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      right: -300px;
+      height: 100%;
+      width: 300px;
+      background-color: #fff;
+      box-shadow: 0 -10px 10px rgba(22,22,22,.4);
+      z-index: 1001;
+      overflow: auto;
+      padding: 80px 0 0;
+      transition: all 0.25s ease-in;
+    }
+    .list-wrapper.is-active {
+      transform: translateX(-300px);
+    }
+    .list-wrapper h3 {
+      padding-left: 20px;
+    }
+    .list-wrapper ul {
+      padding: 0 20px;
+    }
+    .list-wrapper li {
+      position: relative;
+      list-style: none;
+      padding: 0 15px 15px;
+      overflow: hidden;
+      margin: 15px 0;
+      border-radius: 20px;
+      border: 1px solid #ddd;
+    }
+    .list-title {
+      background: #607d8b;
+      color: #fff;
+      margin: 0 -15px;
+      padding: 7px 15px;
+    }
+    .list-title span {
+      vertical-align: middle;
+    }
+    .list-title img {
+      filter: brightness(0) invert(1);
+      width: 25px;
+      vertical-align: middle;
+    }
+    .list-title a {
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .list-address, .list-remark {
+      font-size: 12px;
+    }
+    .list-num {
+      padding: 10px 0;
+    }
+    .list-num span {
+      font-size: 24px;
+    }
+    .list-close {
+      position: absolute;
+      right: 10px;
+      top: 5px;
+      cursor: pointer;
+      width: 30px;
+      height: 30px;
+    }
+    .list-close:before {
+      content: '';
+      position: absolute;
+      width: 30px;
+      height: 2px;
+      background: #fff;
+      transform: translateY(13px) rotate(-45deg);
+    }
+    .list-close:after {
+      content: '';
+      position: absolute;
+      width: 30px;
+      height: 2px;
+      background: #fff;
+      transform: translateY(13px) rotate(45deg);
+    }</style><script src="https://accounts.google.com/gsi/client"></script><script defer="defer" src="map.js"></script></head><body><div class="loading-container"><div class="loading"><p id="loadingText">載入中</p></div></div><div id="map"></div><div class="profile"><div id="name" class="profile-name">未登入</div><div class="profile-btn"><div class="profile-btn-wrapper"><span></span><div style="width:100%;"></div><span></span><div style="width:100%;"></div><span></span></div></div><div class="profile-menu"><div id="showList" class="profile-menu-item">查看清單</div><div id="googleLogin" class="profile-menu-item">gooogle 登入</div><div id="googleLogout" class="profile-menu-item">登出</div></div></div><div class="map-dialog" id="dialog"><div class="map-dialog-title" id="title">藥局名稱</div><div class="map-dialog-title-close"></div><div class="map-row"><div class="map-title">廠牌項目</div><div class="map-content" id="brand">xxxx</div></div><div class="map-row"><div class="map-title">目前結餘數量</div><div class="map-content" id="num">xxxx</div></div><div class="map-row"><div class="map-title">醫事機構地址</div><div class="map-content" id="address">xxxx</div></div><div class="map-row"><div class="map-title">電話</div><div class="map-content" id="tel">xxxx</div></div><div class="map-row"><div class="map-title">備註</div><div class="map-content" id="tips">xxxx</div></div><div class="map-row"><div class="map-title">資料更新時間</div><div class="map-content" id="time">xxxx</div></div><div class="map-actions"><a id="googlemap" target="_blank" rel="noopener">開啟 google 導航</a> <a id="addToList" href="javascript:;" class="love">加入清單</a></div></div><div class="icon"><a target="_blank" href="https://icons8.com/icon/59829/map-marker">Map Marker</a> <a target="_blank" href="https://icons8.com/icon/9730/phone">Phone</a> <a target="_blank" href="https://icons8.com/icon/YZZLTJGUVRar/pharmacy">Pharmacy</a> <a target="_blank" href="https://icons8.com/icon/eprJzDofEHdP/standing-man">Standing Man</a> icon by <a target="_blank" href="https://icons8.com">Icons8</a></div><div id="hos-list-wrapper" class="list-wrapper"><h3>你的專屬清單</h3><ul id="hos-list"></ul></div><div id="login-dialog" class="login-dialog is-inactive"><div class="login-wrapper"><h2 class="login-title">登入帳戶</h2><div class="login-des">將特定藥局加入清單！時時關注不費力！</div><div class="login-btns"><div id="loginWaitBtn" class="login-btn normal">先等一下</div><div id="loginGoBtn" class="login-btn primary">登入 google 帳戶</div></div></div></div></body></html>

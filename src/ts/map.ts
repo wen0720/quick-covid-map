@@ -4,10 +4,12 @@ import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import { io } from 'socket.io-client';
 import axios from 'axios';
 import { initializeApp } from 'firebase/app';
+import { getFirestore } from 'firebase/firestore';
 import { getAuth, signInWithPopup, signInWithRedirect,
   getRedirectResult, GoogleAuthProvider, onAuthStateChanged, signInWithCredential,
   signOut } from 'firebase/auth';
-import { getDatabase, ref, set, push, onValue } from 'firebase/database';
+import { doc, setDoc, collection, onSnapshot,
+  updateDoc, arrayUnion, arrayRemove, getDoc } from 'firebase/firestore';
 
 type itemType = {
   '來源資料時間': string;
@@ -20,6 +22,12 @@ type itemType = {
   '醫事機構地址': string;
   '醫事機構電話': string;
   '醫事機構代碼': string;
+}
+
+type user = {
+  hospitals: string[];
+  uid: string;
+  name: string;
 }
 
 const wsUrl = process.env.NODE_ENV === 'development'
@@ -195,7 +203,7 @@ const firebaseConfig = {
 
 let init = true;
 const app = initializeApp(firebaseConfig);
-const database = getDatabase(app);
+const db = getFirestore(app);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 provider.addScope('https://www.googleapis.com/auth/user.gender.read');
@@ -280,70 +288,62 @@ onAuthStateChanged(auth, async (user) => {
 
     document.getElementById('googleLogout')!.classList.remove('d-none')
     document.getElementById('googleLogin')!.classList.add('d-none')
-    const { uid } = user;
-    const hosRef = ref(database, `users/${uid}/hospitals`);
-
-    // 取得使用者訂閱的醫院清單
-    onValue(hosRef, (snapshot) => {
-      const data: { [key: string]: { hospitalName: string, hospitalId: string } } = snapshot.val();
-      nowUserListIds = Object.keys(data).map((key: string) => data[key].hospitalId);
-      if (!data) {
-        return;
-      }
-      const html = Object.values(data).map(({ hospitalName, hospitalId }) => {
-        const item = allMarkersDataMap[hospitalId];
-        const lat = item['緯度'];
-        const lng = item['經度'];
-        const telString = item['醫事機構電話'].replace(/(\(|\))/g, '').slice(1);
-        const tel = `+886-${telString[0]}-${telString.slice(1)}`;
-        const addressUrl = `https://www.google.com/maps/dir/?api=1&origin${latitude},${longitude}&destination=${lat},${lng}&travelmode=driving`;
-        return `
-          <li>
-            <div class="list-close" data-closeKey="${item['醫事機構代碼']}"></div>
-            <div class="list-title">
-              <span>${item['醫事機構名稱']}</span>
-              <a href="tel:${tel}">
-                <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAABmJLR0QA/wD/AP+gvaeTAAAC3UlEQVRoge2YTWgTQRiGn9lgrfUPEYqKCHoXlArSCupF8NCCBy8etIdSWrulaoQ2iSABaZO0iiJNYixS8aAieBFE7FWpWIpeREHRgx5K9CDUv9ra/bxUTWKy2U0mEcs+kEPenf3mfTM72ZkBDw8PD48yULZX49EWFJeBdTat3iLSjhkc0+rMIUaRqwnszQNsQqlRbY5cYh9A2OiwzobyrZSGfYD/gEUfwKqKizIoFuBjVVyUQbFJ/KFKPkrGPoDiVZV8lEyxAONV8lEyReaA9cBZGRUq30pp2AdIzz4C9c6mhSDip6svoteWc+wDhMMWcL3A1XlEtWMGz2t35YLiLzKfGgF+5KhziBzG7LtSEVcuKB6go/c1cDNHfYYZvFERRy5xtpQQNUD2KGwnMbinIo5c4iyA2fcCRTxbtEaJh1dUwJMrnC/m5mZOA1MZymZU7QXtjlziPEBPeBpoAyRDbSMePabblBvcLae7AveA4SxNcY7kYLNGT65wvx9YNtOLMJmh+BDrFsnIXn22nGO/qS9Eqn89lm8iZ8v5CcvaR3fosR5rzihtR9ZxagrLaAGmM9SVGMYYw9HdWpw5pLQR+EU82oTiPpD5d/oVOLgwXwqTiIaA/oVvs8CXPK3eIBzHDDwsVKa8PbEZGAejGficodYBd0hEzYL3JWM9/DEPUAOsyfNpQHHNzkJ5I/CLS7EdWHIXqM/ShRTfa07g93/7rcVjbSgZcdV3V6BgWz2nEp19k/iMJuBllq7ooHb2KcmBXQDEI4dQkkLXD6ezEACp6GrmuQocyNPTE4StwBLXdW1GQG8AABFFInYSxRmgVkvNij9CmSglmIGzGFYDMKG9fg6VO5nrDD3n/UwjQitCulLd6H+E8nExvArfUj9KdQNrXd9f1Tlgx9DQcuqsVpQcAXY6ukdIYwYKHvFXN0AmicgWxNiPkkZQ20Dq+fs9ksYQk6PB2//GpIeHh8ei5yePyK8E5ckfwQAAAABJRU5ErkJggg=="/>
-              </a>
-              <a target="_blank" href="${addressUrl}">
-                <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAeCAYAAAA7MK6iAAAABmJLR0QA/wD/AP+gvaeTAAABsklEQVRIie3WQUsVURjG8Z8RboIugV2KdJlIS6VNLZJokUUr6zv4Da4t2qgfILfivi8QFuEiglaFCq3atQhdmhcTzNAWcwZG75mZe8cZaOEDL2eY5z3n/87cO+e8XKia2ljCJvZDbGAxeI3oBbo4yYkunjcBPS6ApnFcBv+An1jFLFoFuW3FT3o29nA9b7GzyUf4iA7uYQo3Qu7SANA0FsrA8wF4FJk8FXK3It5b3MIo1iL+Rhk4VUvyylcz3tXgxV7zaGbuWMTv9gsu8n5VAO/WAf4aWXgtwMfwLuJ/qQP8MrJwWXTqALckn16/0G1cqwMMj3DYB/QQD/OgVcDwRPKnyYPu4nERtCoYxsW/603cDjkjTYBhWLKBZDeT4eBN4kcT4LthbOMAv53elw9Kiq4M/o4r4XoZrweYey7wCVYqrntucNHCPf6loiqa1H8D3g9jPx1I9shM9QZzmBi0kFdO91BpBzKfudeR3yRkYydTSM9vPBSB38EzzOA+LucU+Ref8R6f8EfSnUzjAW5G5gz1XOSoJTkIZsII65Kzdl3SwOVpIhQwHR7gG56W8C5Uv/4BUD4M7Kcz/I0AAAAASUVORK5CYII="/>
-              </a>
-            </div>
-            <div class="list-num">
-              剩餘<span> ${item['快篩試劑截至目前結餘存貨數量']} </span>個
-            </div>
-            <div class="list-address">地址：${item['醫事機構地址']}</div>
-            <div class="list-remark">備註：${item['備註']}</div>
-          </li>
-        `
-      }).join('');
-      document.getElementById('hos-list')!.innerHTML = html;
-      document.querySelectorAll<HTMLElement>('.list-close').forEach((el) => {
-        el.addEventListener('click', () => {
-          if (auth.currentUser) {
-            const hosListRef = ref(database, `users/${auth.currentUser.uid}/hospitals`);
-            onValue(hosListRef, (snapshot) => {
-              type firebaseHosipitalsType = {
-                [key: string]: {
-                  hospitalName: string,
-                  hospitalId: string,
-                },
-              }
-              const oldData: firebaseHosipitalsType = snapshot.val();
-              const newData = Object.keys(oldData).reduce((accu: firebaseHosipitalsType, childSnapKey) => {
-                if (oldData[childSnapKey].hospitalId === el.dataset.closekey) {
-                  return accu;
-                }
-                accu[childSnapKey] = oldData[childSnapKey];
-                return accu;
-              }, {});
-              set(hosListRef, newData);
-            }, {
-              onlyOnce: true,
-            })
-          }
+    const { uid, displayName } = user;
+    const usersRef = collection(db, 'users');
+    const userDocRef = doc(usersRef, uid);
+    onSnapshot(userDocRef, (doc) => {
+      if (doc.exists()) {
+        const { hospitals }: user = doc.data() as user;
+        nowUserListIds = [...hospitals];
+        if (hospitals.length === 0) {
+          document.getElementById('hos-list')!.innerHTML = '';
+          return;
+        }
+        const html = hospitals.map((hospitalId) => {
+          const item = allMarkersDataMap[hospitalId];
+          const lat = item['緯度'];
+          const lng = item['經度'];
+          const telString = item['醫事機構電話'].replace(/(\(|\))/g, '').slice(1);
+          const tel = `+886-${telString[0]}-${telString.slice(1)}`;
+          const addressUrl = `https://www.google.com/maps/dir/?api=1&origin${latitude},${longitude}&destination=${lat},${lng}&travelmode=driving`;
+          return `
+            <li>
+              <div class="list-close" data-closeKey="${item['醫事機構代碼']}"></div>
+              <div class="list-title">
+                <span>${item['醫事機構名稱']}</span>
+                <a href="tel:${tel}">
+                  <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAABmJLR0QA/wD/AP+gvaeTAAAC3UlEQVRoge2YTWgTQRiGn9lgrfUPEYqKCHoXlArSCupF8NCCBy8etIdSWrulaoQ2iSABaZO0iiJNYixS8aAieBFE7FWpWIpeREHRgx5K9CDUv9ra/bxUTWKy2U0mEcs+kEPenf3mfTM72ZkBDw8PD48yULZX49EWFJeBdTat3iLSjhkc0+rMIUaRqwnszQNsQqlRbY5cYh9A2OiwzobyrZSGfYD/gEUfwKqKizIoFuBjVVyUQbFJ/KFKPkrGPoDiVZV8lEyxAONV8lEyReaA9cBZGRUq30pp2AdIzz4C9c6mhSDip6svoteWc+wDhMMWcL3A1XlEtWMGz2t35YLiLzKfGgF+5KhziBzG7LtSEVcuKB6go/c1cDNHfYYZvFERRy5xtpQQNUD2KGwnMbinIo5c4iyA2fcCRTxbtEaJh1dUwJMrnC/m5mZOA1MZymZU7QXtjlziPEBPeBpoAyRDbSMePabblBvcLae7AveA4SxNcY7kYLNGT65wvx9YNtOLMJmh+BDrFsnIXn22nGO/qS9Eqn89lm8iZ8v5CcvaR3fosR5rzihtR9ZxagrLaAGmM9SVGMYYw9HdWpw5pLQR+EU82oTiPpD5d/oVOLgwXwqTiIaA/oVvs8CXPK3eIBzHDDwsVKa8PbEZGAejGficodYBd0hEzYL3JWM9/DEPUAOsyfNpQHHNzkJ5I/CLS7EdWHIXqM/ShRTfa07g93/7rcVjbSgZcdV3V6BgWz2nEp19k/iMJuBllq7ooHb2KcmBXQDEI4dQkkLXD6ezEACp6GrmuQocyNPTE4StwBLXdW1GQG8AABFFInYSxRmgVkvNij9CmSglmIGzGFYDMKG9fg6VO5nrDD3n/UwjQitCulLd6H+E8nExvArfUj9KdQNrXd9f1Tlgx9DQcuqsVpQcAXY6ukdIYwYKHvFXN0AmicgWxNiPkkZQ20Dq+fs9ksYQk6PB2//GpIeHh8ei5yePyK8E5ckfwQAAAABJRU5ErkJggg=="/>
+                </a>
+                <a target="_blank" href="${addressUrl}">
+                  <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAeCAYAAAA7MK6iAAAABmJLR0QA/wD/AP+gvaeTAAABsklEQVRIie3WQUsVURjG8Z8RboIugV2KdJlIS6VNLZJokUUr6zv4Da4t2qgfILfivi8QFuEiglaFCq3atQhdmhcTzNAWcwZG75mZe8cZaOEDL2eY5z3n/87cO+e8XKia2ljCJvZDbGAxeI3oBbo4yYkunjcBPS6ApnFcBv+An1jFLFoFuW3FT3o29nA9b7GzyUf4iA7uYQo3Qu7SANA0FsrA8wF4FJk8FXK3It5b3MIo1iL+Rhk4VUvyylcz3tXgxV7zaGbuWMTv9gsu8n5VAO/WAf4aWXgtwMfwLuJ/qQP8MrJwWXTqALckn16/0G1cqwMMj3DYB/QQD/OgVcDwRPKnyYPu4nERtCoYxsW/603cDjkjTYBhWLKBZDeT4eBN4kcT4LthbOMAv53elw9Kiq4M/o4r4XoZrweYey7wCVYqrntucNHCPf6loiqa1H8D3g9jPx1I9shM9QZzmBi0kFdO91BpBzKfudeR3yRkYydTSM9vPBSB38EzzOA+LucU+Ref8R6f8EfSnUzjAW5G5gz1XOSoJTkIZsII65Kzdl3SwOVpIhQwHR7gG56W8C5Uv/4BUD4M7Kcz/I0AAAAASUVORK5CYII="/>
+                </a>
+              </div>
+              <div class="list-num">
+                剩餘<span> ${item['快篩試劑截至目前結餘存貨數量']} </span>個
+              </div>
+              <div class="list-address">地址：${item['醫事機構地址']}</div>
+              <div class="list-remark">備註：${item['備註']}</div>
+            </li>
+          `
+        }).join('');
+        document.getElementById('hos-list')!.innerHTML = html;
+        document.querySelectorAll<HTMLElement>('.list-close').forEach((el) => {
+          el.addEventListener('click', () => {
+            console.log('click');
+            if (auth.currentUser) {
+              updateDoc(userDocRef, {
+                hospitals: arrayRemove(el.dataset.closekey),
+              });
+            }
+          });
         });
-      });
+      } else {
+        setDoc(userDocRef, {
+          name: displayName,
+          hospitals: [],
+          uid,
+        }).catch((error) => console.log(error));
+      }
     });
   } else {
     document.getElementById('googleLogout')!.classList.add('d-none')
@@ -407,7 +407,7 @@ document.getElementById('showList')!.addEventListener('click', () => {
 });
 
 // 加入清單
-document.getElementById('addToList')!.addEventListener('click', () => {
+document.getElementById('addToList')!.addEventListener('click', async () => {
   if (auth.currentUser) {
     if (nowUserListIds.indexOf(nowItem['醫事機構代碼']) > -1) {
       return;
@@ -416,12 +416,25 @@ document.getElementById('addToList')!.addEventListener('click', () => {
       hospitalName: nowItem['醫事機構名稱'],
       hospitalId: nowItem['醫事機構代碼'],
     };
-    const hosListRef = ref(database, `users/${auth.currentUser.uid}/hospitals`);
-    const newHosRef = push(hosListRef);
-    set(newHosRef, postData).then(() => {
-      document.getElementById('addToList')!.classList.add('disabled');
-      alert('清單加入成功');
+    const userDocRef = doc(db, `users/${auth.currentUser.uid}`);
+    updateDoc(userDocRef, {
+      hospitals: arrayUnion(nowItem['醫事機構代碼']),
+    }).catch((error) => {
+      console.log(error);
     });
+
+    const hosDocRef = doc(db, 'hospitals', nowItem['醫事機構代碼']);
+    const hosDocSnap = await getDoc(hosDocRef);
+    if (!hosDocSnap.exists()) {
+      console.log('不存在');
+      setDoc(hosDocRef, postData)
+        .then(() => {
+          document.getElementById('addToList')!.classList.add('disabled');
+          alert('清單加入成功');
+        }).catch((error) => {
+          console.log(error);
+        });
+    }
   }
 });
 
